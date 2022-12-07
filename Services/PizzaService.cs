@@ -1,42 +1,61 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using ContosoPizza.Data;
 using ContosoPizza.Models;
+using Microsoft.EntityFrameworkCore;
 
-namespace ContosoPizza.Services
+namespace ContosoPizza.Services;
+public class PizzaService
 {
-    public static class PizzaService
-    {
-        static List<Pizza> Pizzas { get; }
-        static int nextId = 3;
-        static PizzaService() {
-            Pizzas = new List<Pizza> {
-                new Pizza { Id = 1, Name = "Classic Italian", IsGlutenFree=false},
-                new Pizza { Id = 2, Name = "Veggie", IsGlutenFree = true}
-            };
+    private readonly PizzaContext _context;
+    public PizzaService(PizzaContext context) { 
+        _context = context;
         }
-        
-        public static List<Pizza> GetAll() => Pizzas;
-        public static Pizza? Get(int id) => Pizzas.FirstOrDefault(p=>p.Id == id);
+           
+    
+    public IEnumerable<Pizza> GetAll() {
+        return _context.Pizzas.AsNoTracking().ToList();
+    }
+    public Pizza? GetById(int id) {
+        return _context.Pizzas
+        .Include(p=>p.Toppings)
+        .Include(p=>p.Sauce)
+        .AsNoTracking()
+        .SingleOrDefault(p=>p.Id==id);
+    }
 
-        public static void Add(Pizza pizza) {
-            pizza.Id = nextId ++;
-            Pizzas.Add(pizza);
-        }
+    public Pizza? Create(Pizza newPizza) {
+       _context.Pizzas.Add(newPizza);
+       _context.SaveChanges();
+       return newPizza;
+    }
 
-        public static void Delete(int id) {
-            Pizza pizza = Get(id);
-            if(pizza is null){
-                return;
-            }
-            Pizzas.Remove(pizza);
-        }
+    public void AddTopping(int pizzaId, int toppingId){
+        var pizzaToUpdate = _context.Pizzas.Find(pizzaId);
+        var toppingToAdd = _context.Toppings.Find(toppingId);
 
-        public static void Update(int id, Pizza pizza){
-            var index = Pizzas.FindIndex( p=>p.Id == id);
-            if(index==-1) return;
-            Pizzas[index] = pizza;
-        }
+        if(pizzaToUpdate is null ||toppingToAdd is null)
+            throw new InvalidOperationException("Pizza or topping does not exsit!");
+
+       
+        if(pizzaToUpdate.Toppings is null) pizzaToUpdate.Toppings = new List<Topping>();
+        pizzaToUpdate.Toppings.Add(toppingToAdd);
+        _context.SaveChanges();
+    }
+
+    public void UpdateSauce(int pizzaId, int sauceId){
+       var pizzaToUpdate = _context.Pizzas.Find(pizzaId);
+      
+       var sauceToUpdate = _context.Sauces.Find(sauceId);
+       if(pizzaToUpdate is null || sauceToUpdate is null) 
+            throw new InvalidOperationException("Pizza or sauce does not exist");
+       
+       pizzaToUpdate.Sauce= sauceToUpdate;
+       _context.SaveChanges();
+    }
+
+    public void DeleteById(int id) {
+        var existingPizza = _context.Pizzas.Find(id);
+        if(existingPizza is null) return;
+        _context.Pizzas.Remove(existingPizza);
+        _context.SaveChanges();
     }
 }
